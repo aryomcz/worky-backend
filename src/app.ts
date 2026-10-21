@@ -6,6 +6,8 @@ import { errorHandler } from './middlewares/error.middleware';
 
 import authRoutes from './routes/auth.route';
 import exerciseRoutes from './routes/exercise.route';
+import userRoutes from './routes/user.route';
+import sessionRoutes from './routes/session.route';
 
 const app = express();
 
@@ -24,16 +26,25 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// Register Routes
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/exercises', exerciseRoutes);
+// Root & Health Endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Worky Backend API Service is running',
+  });
+});
 
-// Health Check Endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date() });
 });
 
-// Global Error Middleware
+// Routing API v1
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/exercises', exerciseRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/sessions', sessionRoutes);
+
+// Global Error Handler
 app.use(errorHandler);
 
 export default app;
