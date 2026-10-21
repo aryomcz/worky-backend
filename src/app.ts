@@ -8,6 +8,12 @@ import authRoutes from './routes/auth.route';
 import exerciseRoutes from './routes/exercise.route';
 import userRoutes from './routes/user.route';
 import sessionRoutes from './routes/session.route';
+import planRoutes from './routes/plan.route'; // RUTE BARU
+
+// Serialize BigInt ke JSON
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
 
 const app = express();
 
@@ -43,6 +49,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/exercises', exerciseRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/sessions', sessionRoutes);
+app.use('/api/v1/plans', planRoutes); // DAFTARKAN RUTE PLAN
 
 // Global Error Handler
 app.use(errorHandler);
