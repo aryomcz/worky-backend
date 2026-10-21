@@ -1,0 +1,212 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../src/app/generated/prisma"
+  binaryTargets = ["native"]
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+enum WorkoutGoal {
+  GENERAL_FITNESS      @map("general_fitness")
+  STRENGTH_DEVELOPMENT @map("strength_development")
+  MUSCULAR_ENDURANCE   @map("muscular_endurance")
+  BUILDING_CONSISTENCY @map("building_workout_consistency")
+
+  @@map("workout_goal")
+}
+
+enum ExperienceLevel {
+  BEGINNER     @map("beginner")
+  INTERMEDIATE @map("intermediate")
+  ADVANCED     @map("advanced")
+
+  @@map("user_experience_level")
+}
+
+enum ExerciseCategory {
+  UPPER     @map("upper")
+  LOWER     @map("lower")
+  CORE      @map("core")
+  FULL_BODY @map("full_body")
+
+  @@map("exercise_category")
+}
+
+enum CvStatus {
+  PLANNED      @map("planned")
+  EXPERIMENTAL @map("experimental")
+  VALIDATED    @map("validated")
+
+  @@map("cv_status_type")
+}
+
+enum PlanStatus {
+  ACTIVE   @map("active")
+  ARCHIVED @map("archived")
+
+  @@map("plan_status")
+}
+
+enum SessionStatus {
+  IN_PROGRESS @map("in_progress")
+  COMPLETED   @map("completed")
+  ABANDONED   @map("abandoned")
+
+  @@map("session_status")
+}
+
+enum EventType {
+  REP_COMPLETED      @map("rep_completed")
+  VALID_REP          @map("valid_rep")
+  INVALID_REP        @map("invalid_rep")
+  FORM_ERROR_START   @map("form_error_start")
+  FORM_ERROR_END     @map("form_error_end")
+  TRACKING_LOST      @map("tracking_lost")
+  TRACKING_RECOVERED @map("tracking_recovered")
+  SESSION_PAUSED     @map("session_paused")
+  SESSION_RESUMED    @map("session_resumed")
+  SESSION_COMPLETED  @map("session_completed")
+
+  @@map("event_type")
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+model User {
+  id                     String          @id @default(uuid()) @db.Uuid
+  email                  String          @unique
+  passwordHash           String          @map("password_hash")
+  displayName            String          @map("display_name") @db.VarChar(100)
+  age                    Int?
+  weightKg               Float?          @map("weight_kg")
+  goal                   WorkoutGoal     @default(GENERAL_FITNESS)
+  experienceLevel        ExperienceLevel @default(BEGINNER) @map("experience_level")
+  sessionsPerWeek        Int?            @map("sessions_per_week")
+  sessionDurationMinutes Int?            @map("session_duration_minutes")
+  equipment              Json?           @default("[]")
+  preferences            Json?           @default("{}")
+  reminderTime           String?         @map("reminder_time") @db.VarChar(10) // e.g. "18:30"
+  streakWeeks            Int             @default(0) @map("streak_weeks")
+  createdAt              DateTime        @default(now()) @map("created_at")
+  updatedAt              DateTime        @updatedAt @map("updated_at")
+
+  workoutPlans    WorkoutPlan[]
+  workoutSessions WorkoutSession[]
+
+  @@map("users")
+}
+
+model Exercise {
+  id                           String           @id @default(uuid()) @db.Uuid
+  slug                         String           @unique @db.VarChar(50)
+  name                         String           @db.VarChar(100)
+  category                     ExerciseCategory @default(FULL_BODY)
+  description                  String?          @db.Text
+  instructions                 Json?            @default("[]")
+  equipmentRequired            Json?            @default("[]")
+  cameraGuidance               Json?            @default("{}")
+  supportedErrors              Json?            @default("[]")
+  defaultSets                  Int              @default(3) @map("default_sets")
+  defaultTargetReps            Int?             @default(12) @map("default_target_reps")
+  defaultTargetDurationSeconds Int?             @map("default_target_duration_seconds")
+  defaultRestSeconds           Int              @default(45) @map("default_rest_seconds")
+  cvStatus                     CvStatus         @default(PLANNED) @map("cv_status")
+  modelVersion                 String?          @map("model_version") @db.VarChar(50)
+  isActive                     Boolean          @default(true) @map("is_active")
+  createdAt                    DateTime         @default(now()) @map("created_at")
+  updatedAt                    DateTime         @updatedAt @map("updated_at")
+
+  workoutPlanItems WorkoutPlanItem[]
+  workoutSessions  WorkoutSession[]
+
+  @@map("exercises")
+}
+
+model WorkoutPlan {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @map("user_id") @db.Uuid
+  name      String     @db.VarChar(150)
+  goal      WorkoutGoal
+  status    PlanStatus @default(ACTIVE)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutPlanItems WorkoutPlanItem[]
+  workoutSessions  WorkoutSession[]
+
+  @@map("workout_plans")
+}
+
+model WorkoutPlanItem {
+  id                    String   @id @default(uuid()) @db.Uuid
+  planId                String   @map("plan_id") @db.Uuid
+  exerciseId            String   @map("exercise_id") @db.Uuid
+  dayOfWeek             Int?     @map("day_of_week") // 1: Senin, 7: Minggu
+  orderIndex            Int      @default(1) @map("order_index")
+  sets                  Int
+  targetReps            Int?     @map("target_reps")
+  targetDurationSeconds Int?     @map("target_duration_seconds")
+  restSeconds           Int      @default(45) @map("rest_seconds")
+  notes                 String?  @db.Text
+
+  plan     WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  exercise Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@map("workout_plan_items")
+}
+
+model WorkoutSession {
+  id                    String        @id @default(uuid()) @db.Uuid
+  userId                String        @map("user_id") @db.Uuid
+  planId                String?       @map("plan_id") @db.Uuid
+  exerciseId            String        @map("exercise_id") @db.Uuid
+  sessionName           String?       @map("session_name") @db.VarChar(150)
+  startedAt             DateTime      @default(now()) @map("started_at")
+  completedAt           DateTime?     @map("completed_at")
+  activeDurationSeconds Int           @default(0) @map("active_duration_seconds")
+  totalAttempts         Int           @default(0) @map("total_attempts")
+  totalReps             Int           @default(0) @map("total_reps")
+  validReps             Int           @default(0) @map("valid_reps")
+  invalidReps           Int           @default(0) @map("invalid_reps")
+  unassessedAttempts    Int           @default(0) @map("unassessed_attempts")
+  validHoldSeconds      Int?          @map("valid_hold_seconds")
+  validRepRate          Decimal?      @map("valid_rep_rate") @db.Decimal(5, 2)
+  modelVersion          String        @map("model_version") @db.VarChar(50)
+  status                SessionStatus @default(IN_PROGRESS)
+  createdAt             DateTime      @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan          WorkoutPlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  exercise      Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  workoutEvents WorkoutEvent[]
+
+  @@map("workout_sessions")
+}
+
+model WorkoutEvent {
+  id         String    @id @default(uuid()) @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  eventType  EventType @map("event_type")
+  repIndex   Int?      @map("rep_index")
+  errorCode  String?   @map("error_code") @db.VarChar(100)
+  startMs    BigInt    @map("start_ms")
+  endMs      BigInt?   @map("end_ms")
+  durationMs Int?      @map("duration_ms")
+  confidence Float?
+  details    Json?     @default("{}")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  session WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([errorCode])
+  @@map("workout_events")
+}
